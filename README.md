@@ -1,4 +1,4 @@
-# FiniteGraphsProject# City Network Analysis Tool
+# City Network Analysis Tool
 
 CityNAT is a python library designed to analyse city's network using Finite Graph Theory. 
 
