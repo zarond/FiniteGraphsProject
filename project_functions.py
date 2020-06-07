@@ -9,12 +9,15 @@ import copy
 import scipy as sp
 import scipy.cluster.hierarchy as sch
 import lxml.etree as ET
+import warnings
+warnings.filterwarnings("ignore")
 
 def adjust_weights(house_nd,object_nd): # make weights going to objects a little bigger
     for nd in object_nd:
         for e in G.in_edges(nd):
             rnd = np.random.random() + 1.0
-            G.edges[(e[0],e[1],0)]['length']*=rnd
+            #G.edges[(e[0],e[1],0)]['length']*=rnd
+            G.edges[e]['length']*=rnd
     return
 
 def Part1_1(house_nd,object_nd,X=np.inf):
@@ -109,7 +112,8 @@ def build_paths_tree(pred,dest_nds,origin):
             p = pred.get(nd)
             if len(p)==0:
                 break
-            edge = (p[0],nd,0)
+            #edge = (p[0],nd,0)
+            edge = (p[0],nd)
             if (edge not in sub):
                 sub.append(edge)
             else:
@@ -162,32 +166,34 @@ def Part2_2(house_nd=None,dist_house2house=None):
     N = len(house_nd) 
     # all distances between houses computed
     ClusterDistances = (dist_house2house + dist_house2house.transpose())/2 #make simetrical
-    Clustering = [i for i in range(N)]
-    CLUSTERS = [[[i] for i in range(N)]]
+    Z = np.empty([N-1,4])
+    indices = np.arange(N)
+    number = np.ones(N)
     
     for i in range(N):
         ClusterDistances[i,i]=np.inf
     
-    while (ClusterDistances.shape[1]>2):
+    for c in range(N-1):
         a = np.argmin(ClusterDistances)
         i = a//ClusterDistances.shape[1]
         j = a%ClusterDistances.shape[1]
-        Clustering[i] = [Clustering[i]]
-        Clustering[i].append(Clustering[j])
 
-        tmp = copy.deepcopy(CLUSTERS[-1])
-        tmp[i].extend(tmp[j])
-        del tmp[j]
-        CLUSTERS.append(tmp)
+        Z[c,0]=indices[i]
+        Z[c,1]=indices[j]
+        Z[c,2]=ClusterDistances[i,j]
+        Z[c,3]=number[i]+number[j]
         
         for k in range(ClusterDistances.shape[1]):
             ClusterDistances[i,k] = ClusterDistances[k,i] = max(ClusterDistances[i,k],ClusterDistances[j,k])
 
-        del Clustering[j]
         ClusterDistances = np.delete(ClusterDistances,j,0)
         ClusterDistances = np.delete(ClusterDistances,j,1)
-
-    return Clustering, CLUSTERS
+        indices[i] = c + N
+        number[i] = number[i]+number[j]
+        indices = np.delete(indices,j)
+        number = np.delete(number,j)
+        
+    return Z
 
 def Part2_2_scipy(house_nd = None,dist_house2house=None):
     if (dist_house2house is None and house_nd is not None):
@@ -392,7 +398,7 @@ def load_objects(a):
             print('loaded saved shops objects from file')
         except: shops = None
     elif (a==1):
-        #try:
+        try:
             #load from xml
             tree = ET.parse('network.osm')
             root = tree.getroot()
@@ -467,7 +473,7 @@ def load_objects(a):
 
             
             print('loaded objects from osm file')
-        #except: healthcare = fire = shops = None
+        except: healthcare = fire = shops = None
     if (healthcare is None):
         healthcare = ox.pois_from_place('Ижевск, Россия', {'amenity':healthcare_list}, which_result=1)
         print('downloaded healthcare objects from internet')
@@ -496,7 +502,7 @@ def main(N=100,M=10,k=6,X=5000,choice=0):
     global Xm
     global srcs, dstns, srcs1, dstns1, srcs2, dstns2
     global new_object, tree, tree_weight, sum_dist
-    global tree, tree_weight, sum_dis, Clustering, Cl, Z
+    global tree, tree_weight, sum_dis, Clustering, Cl, Z, Z1
     global  Clusters, Clusters1, TreeFromObject, Trees, center_nd, tree_weight1, sum_dist1
 
     if (G is None):
@@ -509,6 +515,9 @@ def main(N=100,M=10,k=6,X=5000,choice=0):
     largest = max(nx.strongly_connected_components(G), key=len)
 
     G = G.subgraph(largest) # to work with only strongly connected graph
+    G_o = G
+    G = G.to_directed()
+    G = nx.DiGraph(G) # to work with DiGraphs only
 
     # search
     #healthcare = ox.pois_from_place('Ижевск, Россия', amenities=healthcare_list, which_result=1)
@@ -594,20 +603,21 @@ def main(N=100,M=10,k=6,X=5000,choice=0):
     t1 = tm.time()
     
     dist_hous2house = getDistHouse2House(house_nodes)
-    Clustering, Cl = Part2_2(house_nodes,dist_hous2house)
-    Z = Part2_2_scipy(house_nodes,dist_hous2house)
+    Z1 = Part2_2(house_nodes,dist_hous2house) # this one is used
+    Z = Part2_2_scipy(house_nodes,dist_hous2house) #is not used
     t2 = tm.time()
 
     print(t2-t0,' ',t2-t1)
     t1 = tm.time()
     
-    Clusters = getClusters(k, house_nodes, Cl = Cl)
+    Clusters = getClusters(k, house_nodes, Z = Z1)
     Clusters1 = getClusters(k, house_nodes, Z = Z)
-    TreeFromObject, Trees, center_nd, tree_weight1, sum_dist1 = Part2_3(Clusters1,house_nodes,new_object)
+    TreeFromObject, Trees, center_nd, tree_weight1, sum_dist1 = Part2_3(Clusters,house_nodes,new_object)
     t2 = tm.time()
     print(t2-t0,' ',t2-t1)
 
     print ('calculations done')
+    G = G_o
     return
 
 #------------------------------------------------------------------------------------------------------
@@ -672,5 +682,5 @@ def Plot_results_Part2_3():
     print('clusters tree\'s weights: ',tree_weight1)
     print('clusters tree\'s sum of distances: ',sum_dist1)
     #plot_stuff([3],Clusters=Clusters1,house_nodes=house_nodes,Cl_centers=center_nd)
-    plot_stuff([3],Clusters=Clusters1,house_nodes=house_nodes,origin=new_object,tree=TreeFromObject,Cl_centers=center_nd,Trees=Trees)
+    plot_stuff([3],Clusters=Clusters,house_nodes=house_nodes,origin=new_object,tree=TreeFromObject,Cl_centers=center_nd,Trees=Trees)
     #plot_stuff([1], house_nodes = house_nodes, objects_nodes = [], Cl_centers=center_nd)
