@@ -236,12 +236,12 @@ def Part2_3(clusters,house_nd,object_nd):
         Trees.append(tree)
 
     TreeFromObject, dist = make_paths_tree(center_nd,object_nd)
-    return TreeFromObject, Trees, center_nd, tree_weight, sum_dist
+    return TreeFromObject, Trees, center_nd, tree_weight, sum_dist, dist
 
 def plot_stuff(a,Clusters=None,house_nodes=None,objects_nodes=None, Cl_centers=[],tree=None,origin=None,tree_targets=None,src_nds=None,dst_nds=None,Trees=None,Z=None, twoWay = False):
     if (0 in a): # plot just map
         #fig, ax = ox.plot_graph(G)
-        fig, ax = ox.plot_graph(G, node_size=0,show=False, close=False)
+        fig, ax = ox.plot_graph(G_o, node_size=0,show=False, close=False)
     if (1 in a): # plot houses and objects
         color = [[0.0,0.0,0.0,0.0] for node in G.nodes()]
         for el in house_nodes:
@@ -250,13 +250,13 @@ def plot_stuff(a,Clusters=None,house_nodes=None,objects_nodes=None, Cl_centers=[
              color[list(G.nodes()).index(el)] = [0.0,0.0,1.0,1.0]
         for el in Cl_centers:
              color[list(G.nodes()).index(el)] = [0.0,1.0,0.0,1.0] 
-        fig, ax = ox.plot_graph(G, node_color = color, node_zorder = 3, node_alpha=None, show=False, close=False)
+        fig, ax = ox.plot_graph(G_o, node_color = color, node_zorder = 3, node_alpha=None, show=False, close=False)
     if (2 in a): # plot tree
         color = [[1.0,0.0,0.0,1.0] if (node in tree_targets) else [0.0,0.0,0.0,0.0] for node in G.nodes()]
         color[list(G.nodes()).index(origin)] = [0.0,0.0,1.0,1.0]
         edge_color = [[1.0,0.0,0.1,0.8] if (edge in tree.edges()) else [0.5,0.5,0.5,0.5] for edge in G.edges()]
         edge_linewidth = [1 if (edge in tree.edges()) else 0.5 for edge in G.edges()]
-        fig, ax = ox.plot_graph(G, node_color = color, node_zorder = 3, edge_color = edge_color,edge_linewidth = edge_linewidth,node_alpha=None, edge_alpha=None, show=False, close=False)
+        fig, ax = ox.plot_graph(G_o, node_color = color, node_zorder = 3, edge_color = edge_color,edge_linewidth = edge_linewidth,node_alpha=None, edge_alpha=None, show=False, close=False)
     if (3 in a): # plot different clusters
         color = [[0.0,0.0,0.0,0.0] for node in G.nodes()]
         cltones = []
@@ -285,7 +285,7 @@ def plot_stuff(a,Clusters=None,house_nodes=None,objects_nodes=None, Cl_centers=[
                 edge_linewidth = [1 if (listG[i] in tr.edges()) else edge_linewidth[i] for i in range(len(listG))]
         #fig, ax = ox.plot_graph(G, node_color = color, node_zorder = 3, edge_color = edge_color,edge_linewidth = edge_linewidth,node_alpha=None, edge_alpha=None, show=False, close=False)
         #-----------------------------------------------------------------    
-        fig, ax = ox.plot_graph(G, node_color = color, edge_color = edge_color,edge_linewidth = edge_linewidth, node_zorder = 3, node_alpha=None,node_size=100,show=False, close=False)
+        fig, ax = ox.plot_graph(G_o, node_color = color, edge_color = edge_color,edge_linewidth = edge_linewidth, node_zorder = 3, node_alpha=None,node_size=100,show=False, close=False)
     if (4 in a): # plot routes
         color = [[0.0,0.0,1.0,1.0] if (node in src_nds) else [0.0,0.0,0.0,0.0] for node in G.nodes()]
         for el in dst_nds:
@@ -298,7 +298,7 @@ def plot_stuff(a,Clusters=None,house_nodes=None,objects_nodes=None, Cl_centers=[
             Routes.extend(Routes2)
             #route_color.extend(['b' for i in dst_nds])
             route_color = route_color +  ['b']*sum([len(i) for i in Routes2])
-        fig, ax = ox.plot_graph_routes(G, Routes, node_color=color,route_alpha=0.7,orig_dest_node_alpha=1.0,orig_dest_node_size=20,route_linewidth=3, node_zorder=5, node_alpha=None, route_color=route_color, show=False, close=False)
+        fig, ax = ox.plot_graph_routes(G_o, Routes, node_color=color,route_alpha=0.7,orig_dest_node_alpha=1.0,orig_dest_node_size=20,route_linewidth=3, node_zorder=5, node_alpha=None, route_color=route_color, show=False, close=False)
     if (5 in a): # plot dendrogram
         dn = sch.dendrogram(Z)
 
@@ -486,11 +486,12 @@ def load_objects(a):
     return
 #-----------------------
 G = None
+G_o = None
 healthcare = fire = shops = None
 
   
 def main(N=100,M=10,k=6,X=5000,choice=0):
-    global G
+    global G, G_o
     global healthcare, fire, shops
     global objects
     global objects_nodes
@@ -503,7 +504,7 @@ def main(N=100,M=10,k=6,X=5000,choice=0):
     global srcs, dstns, srcs1, dstns1, srcs2, dstns2
     global new_object, tree, tree_weight, sum_dist
     global tree, tree_weight, sum_dis, Clustering, Cl, Z, Z1
-    global  Clusters, Clusters1, TreeFromObject, Trees, center_nd, tree_weight1, sum_dist1
+    global  Clusters, Clusters1, TreeFromObject, Trees, center_nd, tree_weight1, sum_dist1, treedist
 
     if (G is None):
         load_graph(0)
@@ -515,7 +516,8 @@ def main(N=100,M=10,k=6,X=5000,choice=0):
     largest = max(nx.strongly_connected_components(G), key=len)
 
     G = G.subgraph(largest) # to work with only strongly connected graph
-    G_o = G
+    if G_o is None:
+        G_o = G
     G = G.to_directed()
     G = nx.DiGraph(G) # to work with DiGraphs only
 
@@ -612,12 +614,12 @@ def main(N=100,M=10,k=6,X=5000,choice=0):
     
     Clusters = getClusters(k, house_nodes, Z = Z1)
     Clusters1 = getClusters(k, house_nodes, Z = Z)
-    TreeFromObject, Trees, center_nd, tree_weight1, sum_dist1 = Part2_3(Clusters,house_nodes,new_object)
+    TreeFromObject, Trees, center_nd, tree_weight1, sum_dist1, treedist = Part2_3(Clusters,house_nodes,new_object)
     t2 = tm.time()
     print(t2-t0,' ',t2-t1)
 
     print ('calculations done')
-    G = G_o
+    #G = G_o
     return
 
 #------------------------------------------------------------------------------------------------------
@@ -674,13 +676,14 @@ def Plot_results_Part2_1():
 
 def Plot_results_Part2_2():
     print('plotting dendrogram for house clustering. All houses are presented by their indices in house_nodes array.')
-    plot_stuff([5],Z=Z)
+    plot_stuff([5],Z=Z1)
     return
 
 def Plot_results_Part2_3():
     print('plotting',km,' clusters, shortest paths from new object to centers of clusters and trees from centers to nodes in cluster. New object - black node, centers - gray nodes')
     print('clusters tree\'s weights: ',tree_weight1)
     print('clusters tree\'s sum of distances: ',sum_dist1)
+    print('tree from new object distances: ',treedist,'\ntree from new object weight: ',TreeFromObject.size(weight='length'))
     #plot_stuff([3],Clusters=Clusters1,house_nodes=house_nodes,Cl_centers=center_nd)
     plot_stuff([3],Clusters=Clusters,house_nodes=house_nodes,origin=new_object,tree=TreeFromObject,Cl_centers=center_nd,Trees=Trees)
     #plot_stuff([1], house_nodes = house_nodes, objects_nodes = [], Cl_centers=center_nd)
